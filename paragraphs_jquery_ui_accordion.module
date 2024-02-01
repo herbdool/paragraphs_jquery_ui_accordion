@@ -41,40 +41,75 @@ function paragraphs_jquery_ui_accordion_field_formatter_settings_summary($field,
 }
 
 /**
+ * Get Paragraph bundles
+ *
+ * @return array
+ *   An array of paragraph type labels keyed by the machine name.
+ */
+function _paragraphs_jquery_ui_accordion_bundle_options() {
+  $bundles = paragraphs_bundle_load();
+  foreach ($bundles as $bundle) {
+    $bundles_options[$bundle->bundle] = $bundle->name;
+  }
+  return $bundles_options;
+}
+
+/**
+ * Get Paragraph fields for a bundle
+ *
+ * @param string $bundle_name
+ * @return array
+ */
+function _paragraphs_jquery_ui_accordion_paragraph_fields_options($bundle_name) {
+  $bundle = paragraphs_bundle_load($bundle_name);
+  $instances = field_info_instances('paragraphs_item', $bundle->bundle);
+  foreach ($instances as $paragraphs_instance) {
+    $paragraphs_fields[$paragraphs_instance['field_name']] = $paragraphs_instance['label'];
+  }
+  return $paragraphs_fields;
+}
+
+/**
  * Implements hook_field_formatter_settings_form().
  */
 function paragraphs_jquery_ui_accordion_field_formatter_settings_form($field, $instance, $view_mode, $form, &$form_state) {
   $display = $instance['display'][$view_mode];
   $settings = $display['settings'];
   $element = array();
+  $field_name = $field['field_name'];
 
-  $bundles = paragraphs_bundle_load();
-  $paragraphs_fields = $bundles_options = array();
-  foreach ($bundles as $bundle) {
-    $instances = field_info_instances('paragraphs_item', $bundle->bundle);
-    $bundles_options[$bundle->bundle] = $bundle->name;
-    foreach ($instances as $paragraphs_instance) {
-      $paragraphs_fields[$paragraphs_instance['field_name']] = $paragraphs_instance['label'];
-    }
-  }
+  $bundles_options = _paragraphs_jquery_ui_accordion_bundle_options();
+
+  $values = isset($form_state['values']['fields'][$field_name]['settings_edit_form']['settings']) ? $form_state['values']['fields'][$field_name]['settings_edit_form']['settings'] : array();
+  $selected_bundle = isset($values['bundle']) ? $values['bundle'] : $settings['bundle'];
 
   $element['bundle'] = array(
     '#type' => 'select',
     '#title' => t('Paragraph bundle'),
-    '#default_value' => $settings['bundle'],
+    '#default_value' => $selected_bundle,
     '#options' => $bundles_options,
+    '#ajax' => array(
+      'event' => 'change',
+      'wrapper' => 'field-wrapper',
+      'callback' => 'paragraphs_jquery_ui_accordion_ajax_callback',
+      'method' => 'replace',
+    ),
   );
-  $element['title'] = array(
+  $element['field_wrapper'] = array(
+    '#prefix' => '<div class="field-wrapper">',
+    '#suffix' => '</div>',
+  );
+  $element['field_wrapper']['title'] = array(
     '#type' => 'select',
     '#title' => t('Paragraph title'),
-    '#default_value' => $settings['title'],
-    '#options' => $paragraphs_fields,
+    '#default_value' => isset($values['field_wrapper']['title']) ? $values['field_wrapper']['title'] : $settings['title'],
+    '#options' => _paragraphs_jquery_ui_accordion_paragraph_fields_options($selected_bundle),
   );
-  $element['content'] = array(
+  $element['field_wrapper']['content'] = array(
     '#type' => 'select',
     '#title' => t('Paragraph content'),
-    '#default_value' => $settings['content'],
-    '#options' => $paragraphs_fields,
+    '#default_value' => isset($values['field_wrapper']['content']) ? $values['field_wrapper']['content'] : $settings['content'],
+    '#options' => _paragraphs_jquery_ui_accordion_paragraph_fields_options($selected_bundle),
   );
   $element['autoscroll'] = array(
     '#type' => 'checkbox',
@@ -87,6 +122,13 @@ function paragraphs_jquery_ui_accordion_field_formatter_settings_form($field, $i
     '#default_value' => isset($settings['startclosed']) ? $settings['startclosed'] : 0,
   );
   return $element;
+}
+
+/**
+ * Paragraph field ajax callback.
+ */
+function paragraphs_jquery_ui_accordion_ajax_callback($form, $form_state) {
+  return $form;
 }
 
 /**
